@@ -1,0 +1,18 @@
+# Example Codex provider for dsh-siliconflow-keypool.
+# Merge this block into ~/.codex/config.toml, then select the profile with
+# `codex --profile siliconflow_keypool`.
+#
+# The gateway is served by the running DSH web process on 127.0.0.1:3080.
+# `env_key` only needs to be a set environment variable; the gateway ignores
+# the Authorization header unless `gateway.token` is configured.
+
+[model_providers.siliconflow_keypool]
+name = "SiliconFlow Key Pool"
+base_url = "http://127.0.0.1:3080/api/siliconflow-keypool/v1"
+env_key = "SILICONFLOW_KEYPOOL_TOKEN"
+wire_api = "responses"
+http_headers = { "x-siliconflow-session" = "codex-local", "x-siliconflow-key" = "k1" }
+
+[profiles.siliconflow_keypool]
+model_provider = "siliconflow_keypool"
+model = "deepseek-ai/DeepSeek-V4.1-Flash"

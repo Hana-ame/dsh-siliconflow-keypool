@@ -1,0 +1,23 @@
+{
+  "baseURL": "https://api.siliconflow.cn/v1",
+  "chatPath": "/chat/completions",
+  "mode": "auto",
+  "defaultKey": "k1",
+  "keys": [],
+  "timeoutMs": 120000,
+  "maxRetries": 3000,
+  "retryBaseDelayMs": 1000,
+  "retryMaxDelayMs": 6000,
+  "retryableCodes": [
+    "RATE_LIMIT",
+    "TIMEOUT",
+    "SERVER",
+    "TRANSPORT"
+  ],
+  "defaultModel": "deepseek-ai/DeepSeek-V4.1-Flash",
+  "gateway": {
+    "enabled": true,
+    "path": "/api/siliconflow-keypool/v1",
+    "token": ""
+  }
+}

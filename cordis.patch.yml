@@ -1,0 +1,11 @@
+# dsh-siliconflow-keypool bundle patch.
+#
+# One insert line mounts the Host half. `llm` is the only hard dependency:
+# without it the adapter cannot register. The optional webServer is reached
+# through a nested ctx.inject() fiber, so a headless composition still gets
+# the provider and merely loses the local OpenAI/Codex gateway.
+- insert:
+    - id: siliconflow-keypool
+      name: 'dsh-siliconflow-keypool'
+      inject: ['llm']
+      config: {}
