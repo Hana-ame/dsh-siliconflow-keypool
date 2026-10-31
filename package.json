@@ -1,6 +1,6 @@
 {
   "name": "dsh-siliconflow-keypool",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "description": "SiliconFlow provider with a multi-key pool and a Settings page for entering keys. Each DSH session is pinned to one key; automatic round-robin or manual selection. Also exposes an OpenAI-compatible local gateway with Chat Completions and Codex Responses endpoints.",
