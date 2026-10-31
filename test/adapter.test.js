@@ -208,3 +208,44 @@ test('non-streaming JSON response is accepted', async () => {
   assert.equal(chunks.filter(c => c.type === 'text-delta').map(c => c.text).join(''), 'json answer')
   assert.deepEqual(chunks.at(-1).reason, { kind: 'stop' })
 })
+
+test('testModel sends a single hi through the pool key and reports latency', async () => {
+  const { adapter, calls } = adapterWith(() => sseResponse('你好'))
+  const result = await adapter.testModel({ model: 'deepseek-ai/DeepSeek-V4.1-Flash' })
+
+  assert.equal(result.ok, true)
+  assert.equal(result.text, '你好')
+  assert.equal(result.key, 'k1')
+  assert.equal(result.model, 'deepseek-ai/DeepSeek-V4.1-Flash')
+  assert.equal(typeof result.latencyMs, 'number')
+  assert.equal(calls.length, 1)
+  const body = JSON.parse(calls[0].init.body)
+  assert.deepEqual(body.messages, [{ role: 'user', content: 'hi' }])
+  assert.ok(body.max_tokens > 0)
+})
+
+test('testModel with @alias uses that key without binding a session', async () => {
+  const { adapter, calls } = adapterWith(() => sseResponse('ok'))
+  const result = await adapter.testModel({ model: 'deepseek-ai/DeepSeek-V4.1-Flash@k2' })
+
+  assert.equal(result.ok, true)
+  assert.equal(result.key, 'k2')
+  assert.equal(calls[0].init.headers.authorization, 'Bearer sk-second-secret')
+})
+
+test('testModel reports an upstream failure as a result instead of throwing', async () => {
+  const { adapter } = adapterWith(() => new Response('{"error":{"message":"boom"}}', {
+    status: 500,
+    headers: { 'content-type': 'application/json' },
+  }))
+  const result = await adapter.testModel({ model: 'deepseek-ai/DeepSeek-V4.1-Flash' })
+  assert.equal(result.ok, false)
+  assert.ok(result.error?.message)
+})
+
+test('testModel rejects an empty model id without touching the network', async () => {
+  const { adapter, calls } = adapterWith(() => sseResponse())
+  const result = await adapter.testModel({ model: '   ' })
+  assert.equal(result.ok, false)
+  assert.equal(calls.length, 0)
+})

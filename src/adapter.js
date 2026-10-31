@@ -255,4 +255,64 @@ export class SiliconFlowKeyPoolAdapter {
       }
     }
   }
+
+  /**
+   * 设置页「测试」按钮：用池里的 key 给指定模型发一条 `hi`，返回耗时与回复。
+   *
+   * 走适配器自己的 `stream()`（而不是另拼一路 HTTP），所以测的是**真实链路**：
+   * key 选择/轮询、请求体形状、SSE 解析、限流重试全部参与。但不传 sessionId，
+   * `pickKey` 走匿名分支——不会在状态文件里给测试会话留下 key 绑定。
+   *
+   * @param {{ model?: string, maxTokens?: number, timeoutMs?: number }} [options]
+   * @returns {Promise<object>} `{ ok, model, key, latencyMs, text, reasoning?, usage?, error? }`
+   */
+  async testModel({ model, maxTokens = 512, timeoutMs = 30_000 } = {}) {
+    const started = Date.now()
+    const requested = String(model ?? '').trim()
+    const outcome = { ok: false, model: requested, key: '', latencyMs: 0, text: '' }
+    if (requested === '') {
+      outcome.error = { code: 'CONFIG', message: 'model id is empty' }
+      return outcome
+    }
+    let picked
+    try {
+      picked = this.pickKey({ model: requested })
+    } catch (error) {
+      outcome.error = { code: 'CONFIG', message: String(error?.message ?? error) }
+      return outcome
+    }
+    outcome.key = picked.alias
+    outcome.model = parseModelId(requested).modelId
+
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), Math.max(1_000, Number(timeoutMs) || 30_000))
+    try {
+      for await (const chunk of this.stream({
+        provider: ROUTE,
+        model: requested,
+        messages: [{ role: 'user', content: 'hi' }],
+        maxTokens: Number(maxTokens) > 0 ? Number(maxTokens) : 512,
+        signal: controller.signal,
+      })) {
+        if (chunk.type === 'text-delta') outcome.text += chunk.text
+        else if (chunk.type === 'reasoning-delta') outcome.reasoning = (outcome.reasoning ?? '') + chunk.text
+        else if (chunk.type === 'usage') outcome.usage = chunk.usage
+        else if (chunk.type === 'finish') {
+          outcome.ok = chunk.reason?.kind !== 'error' && chunk.reason?.kind !== 'aborted'
+          if (!outcome.ok) outcome.error = chunk.reason?.failure ?? { code: 'UNKNOWN', message: 'stream failed' }
+        }
+      }
+    } catch (error) {
+      outcome.ok = false
+      outcome.error = { code: error?.code ?? 'TEST_FAILED', message: String(error?.message ?? error) }
+    } finally {
+      clearTimeout(timer)
+    }
+    outcome.latencyMs = Date.now() - started
+    if (outcome.ok && outcome.text.trim() === '') {
+      outcome.ok = false
+      outcome.error = { code: 'EMPTY', message: '模型返回了空文本' }
+    }
+    return outcome
+  }
 }

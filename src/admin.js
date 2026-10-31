@@ -239,6 +239,27 @@ export function createAdmin({ settingsPath, adapter, onSaved = () => {}, warn = 
         return
       }
 
+      // Settings-page "test" button: send one `hi` through the real adapter
+      // path (key selection / body shaping / SSE / retry) and report latency
+      // and the reply. Runs unbound (no sessionId), so it leaves no session-key
+      // binding behind.
+      if (req.method === 'POST' && suffix === '/test') {
+        const contentType = String(header(req, 'content-type') ?? '').toLowerCase()
+        if (!contentType.startsWith('application/json')) {
+          throw new Error('content-type must be application/json')
+        }
+        const body = await readBody(req)
+        const model = typeof body.model === 'string' ? body.model.trim() : ''
+        if (model === '' || model.length > 200) {
+          throw new Error('model must be a non-empty string (<= 200 chars)')
+        }
+        if (typeof adapter.testModel !== 'function') {
+          throw new Error('adapter does not support testModel')
+        }
+        sendJson(res, 200, await adapter.testModel({ model, timeoutMs: 30_000 }))
+        return
+      }
+
       sendError(res, 404, `unknown admin path ${pathname}`, 'NOT_FOUND')
     } catch (error) {
       warn(`siliconflow-keypool admin: ${error?.message ?? error}`)

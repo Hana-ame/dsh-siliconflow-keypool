@@ -199,3 +199,34 @@ test('admin refuses non-loopback callers', async () => {
   const response = await invoke(admin, { address: '10.0.0.4' })
   assert.equal(response.status, 403)
 })
+
+test('POST /test runs a one-shot hi through the adapter', async () => {
+  const adapter = { testModel: async ({ model }) => ({ ok: true, model, key: 'k1', latencyMs: 12, text: '你好' }) }
+  const handler = createAdmin({ settingsPath: tempFile({ keys: [], models: [] }), adapter })
+  const response = await invoke(handler, {
+    method: 'POST',
+    url: '/api/siliconflow-keypool/admin/test',
+    body: { model: 'deepseek-ai/DeepSeek-V4.1-Flash' },
+  })
+  assert.equal(response.status, 200)
+  assert.equal(response.body.ok, true)
+  assert.equal(response.body.text, '你好')
+})
+
+test('POST /test validates the model and stays loopback-only', async () => {
+  const adapter = { testModel: async () => ({ ok: true }) }
+  const handler = createAdmin({ settingsPath: tempFile({ keys: [], models: [] }), adapter })
+  const empty = await invoke(handler, {
+    method: 'POST',
+    url: '/api/siliconflow-keypool/admin/test',
+    body: { model: '' },
+  })
+  assert.equal(empty.status, 400)
+  const remote = await invoke(handler, {
+    method: 'POST',
+    url: '/api/siliconflow-keypool/admin/test',
+    body: { model: 'x' },
+    address: '10.1.2.3',
+  })
+  assert.equal(remote.status, 403)
+})
